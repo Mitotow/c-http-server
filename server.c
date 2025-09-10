@@ -1,6 +1,4 @@
 // Server side C program to demonstrate Socket programming
-#include <argp.h>
-#include <asm-generic/errno.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <signal.h>
@@ -10,7 +8,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <threads.h>
-#include <time.h>
 #include <unistd.h>
 
 // Server Parameters
