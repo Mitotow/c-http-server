@@ -5,14 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-static struct HTTP_router *router;
-
-void initRouter() {
-  router = (struct HTTP_router *)malloc(sizeof(size_t));
+router_t *initRouter() {
+  router_t *router = (router_t *)malloc(sizeof(router_t));
   router->routes_size = 0;
+  router->routes = (route_t *)malloc(sizeof(route_t) * router->routes_size);
+
+  return router;
 }
 
-bool existsRoute(struct HTTP_route route) {
+bool existsRoute(router_t *router, route_t route) {
   for (int i = 0; i < router->routes_size; i++) {
     if (router->routes[i].path == route.path) {
       return true;
@@ -22,26 +23,26 @@ bool existsRoute(struct HTTP_route route) {
   return false;
 }
 
-void addRoute(char *path, char *filename) {
+void addRoute(router_t *router, char *path, char *filename) {
   size_t length = router->routes_size;
 
-  struct HTTP_route route;
+  route_t route;
   route.path = path;
   route.fileName = filename;
 
-  if (existsRoute(route))
+  if (existsRoute(router, route))
     return;
   length++;
-  router = (struct HTTP_router *)realloc(
-      router, sizeof(size_t) + length * sizeof(struct HTTP_route));
   router->routes_size = length;
+  router->routes =
+      (route_t *)realloc(router->routes, sizeof(router_t) * length);
   router->routes[length - 1] = route;
 }
 
-char *getFilename(char *path) {
+route_t *getRouteByPath(router_t *router, char *path) {
   for (int i = 0; i < router->routes_size; i++) {
     if (strcmp(router->routes[i].path, path) == 0) {
-      return router->routes[i].fileName;
+      return &router->routes[i];
     }
   }
 
@@ -50,4 +51,7 @@ char *getFilename(char *path) {
   return NULL;
 }
 
-void destroyRouter() { free(router); }
+void destroyRouter(router_t *router) {
+  free(router->routes);
+  free(router);
+}

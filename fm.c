@@ -1,20 +1,27 @@
 #include "fm.h"
 #include "http.h"
 #include "logger.h"
+#include "router.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Retrieve file path from a request
-char *getFilePathFromRequest(struct request req) {
+char *getFilePath(char *str) {
   char *path;
-  size_t size = strlen(PUBLIC_DIR) + 1 + strlen(req.route) + 1;
+  size_t size = strlen(PUBLIC_DIR) + 1 + strlen(str) + 1;
   path = (char *)malloc(size);
 
   strcpy(path, PUBLIC_DIR);
-  strcat(path, req.route);
+  strcat(path, str);
 
   return path;
+}
+
+// Retrieve file path from a request
+char *getFilePathFromRequest(request_t req) { return getFilePath(req.route); }
+
+char *getFilePathFromRoute(route_t route) {
+  return getFilePath(route.fileName);
 }
 
 // Read file, return it's content and set the s

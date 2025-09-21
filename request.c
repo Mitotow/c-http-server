@@ -1,11 +1,10 @@
 #include "request.h"
 #include "http.h"
 #include "logger.h"
-#include <stdio.h>
 #include <string.h>
 
 // Fetch the HTTP request header to setup the request struct
-void fetchRequestHeader(char *token, struct request *req) {
+void fetchRequestHeader(char *token, request_t *req) {
   int index = 0;
   char *rest = token;
 
@@ -31,7 +30,7 @@ void fetchRequestHeader(char *token, struct request *req) {
 }
 
 // Fetch the HTTP request content to setupt the request struct
-void fetchRequestContent(char *token, struct request *req) {
+void fetchRequestContent(char *token, request_t *req) {
   char *rest = token;
   char *oldToken = NULL;
 
@@ -61,7 +60,7 @@ void fetchRequestContent(char *token, struct request *req) {
 }
 
 // Read a line of the HTTP request and dispatch it between 2 functions
-void readRequestLine(char *token, struct request *req, bool isHeader) {
+void readRequestLine(char *token, request_t *req, bool isHeader) {
   if (isHeader == true) {
     fetchRequestHeader(token, req);
   } else {
@@ -70,7 +69,7 @@ void readRequestLine(char *token, struct request *req, bool isHeader) {
 }
 
 // Check if every required parameters are given in a request
-bool isValidRequest(struct request req) {
+bool isValidRequest(request_t req) {
   // Check the presence of default HTTP Headers
   if (req.method == NULL || req.route == NULL || req.httpVersion == NULL) {
     return false;
@@ -91,7 +90,7 @@ bool isValidRequest(struct request req) {
   return true;
 }
 
-void normalizeRequestRoute(struct request *req) {
+void normalizeRequestRoute(request_t *req) {
   if (req->route == NULL || req->route[0] == '\0') {
     req->route = "/";
     return;
@@ -104,10 +103,8 @@ void normalizeRequestRoute(struct request *req) {
 }
 
 // Read HTTP request
-void readRequest(char *buffer, struct request *req) {
-  char log_message[LOG_BUFFER_SIZE];
+void readRequest(char *buffer, request_t *req) {
   bool isHeader = true;
-  bool isContent = false;
 
   // Parse Http Request
   char *token;
@@ -126,7 +123,6 @@ void readRequest(char *buffer, struct request *req) {
   }
 
   normalizeRequestRoute(req);
-  sprintf(log_message, "Request - %s %s %s", req->method, req->host,
-          req->route);
-  writeLog(LOG_INFO, log_message);
+  writeLog(LOG_INFO, "Request - mthd=%s h=%s r=%s", req->method, req->host,
+           req->route);
 }

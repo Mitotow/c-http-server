@@ -12,6 +12,16 @@
 #define NOT_FOUND 404
 #define INTERNAL_SERVER_ERROR 500
 
+typedef struct {
+  char *httpVersion;
+  int statusCode;
+  char *statusName;
+  long contentLength;
+  char *contentType;
+  char *connection;
+  char *content;
+} response_t;
+
 struct response {
   char *httpVersion;
   int statusCode;
@@ -22,10 +32,10 @@ struct response {
   char *content;
 };
 
-ssize_t sendResponse(int client_socket, struct response res);
-void addDefaultHeadersResponse(struct request req, struct response *res);
-void createResponse(struct request req, struct response *res, int statusCode);
-void createContentResponse(struct request req, struct response *res,
-                           char *cnotentType, char *content, long length);
+ssize_t sendResponse(int client_socket, response_t res);
+void addDefaultHeadersResponse(request_t req, response_t *res);
+void createResponse(request_t req, response_t *res, int statusCode);
+void createContentResponse(request_t req, response_t *res, char *cnotentType,
+                           char *content, long length);
 
 #endif

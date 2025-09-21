@@ -9,7 +9,7 @@
 #define LOG_FATAL "FATAL"
 #define LOG_BUFFER_SIZE 1024
 
-void writeLog(char *prefix, char *message);
-void writeLogSocket(char *prefix, int sock, char *message);
+void writeLog(char *prefix, char *message, ...);
+void writeFatal(char *message, ...);
 
 #endif

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 
-ssize_t sendResponse(int client_socket, struct response res) {
+ssize_t sendResponse(int client_socket, response_t res) {
   char header[RESPONSE_HEADER_SIZE];
   char *cur = header;
   char *const end = header + sizeof(header);
@@ -49,7 +49,7 @@ ssize_t sendResponse(int client_socket, struct response res) {
 }
 
 // Create basic headers of a response
-void addDefaultHeadersResponse(struct request req, struct response *res) {
+void addDefaultHeadersResponse(request_t req, response_t *res) {
   char *connection = req.connection;
   if (connection == NULL) {
     if (strcmp(req.httpVersion, HTTP_1_0)) {
@@ -66,14 +66,14 @@ void addDefaultHeadersResponse(struct request req, struct response *res) {
 }
 
 // Create a response
-void createResponse(struct request req, struct response *res, int statusCode) {
+void createResponse(request_t req, response_t *res, int statusCode) {
   addDefaultHeadersResponse(req, res);
   res->statusCode = statusCode;
 }
 
 // Create a response that contains content
-void createContentResponse(struct request req, struct response *res,
-                           char *contentType, char *content, long length) {
+void createContentResponse(request_t req, response_t *res, char *contentType,
+                           char *content, long length) {
   createResponse(req, res, 200);
   res->contentType = contentType;
   res->contentLength = length;

@@ -2,19 +2,19 @@
 #ifndef ROUTER_H
 #define ROUTER_H
 
-struct HTTP_route {
+typedef struct {
   char *path;
   char *fileName;
-};
+} route_t;
 
-struct HTTP_router {
+typedef struct {
   size_t routes_size;
-  struct HTTP_route routes[];
-};
+  route_t *routes;
+} router_t;
 
-void initRouter();
-void addRoute(char *path, char *filename);
-char *getFilename(char *path);
-void destroyRouter();
+router_t *initRouter();
+void addRoute(router_t *router, char *path, char *filename);
+route_t *getRouteByPath(router_t *router, char *path);
+void destroyRouter(router_t *router);
 
 #endif
