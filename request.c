@@ -90,6 +90,7 @@ bool isValidRequest(request_t req) {
   return true;
 }
 
+// Normalize the request path to avoid security problems
 void normalizeRequestRoute(request_t *req) {
   if (req->route == NULL || req->route[0] == '\0') {
     req->route = "/";
@@ -123,6 +124,6 @@ void readRequest(char *buffer, request_t *req) {
   }
 
   normalizeRequestRoute(req);
-  writeLog(LOG_INFO, "Request - mthd=%s h=%s r=%s", req->method, req->host,
-           req->route);
+  writeLog(LOG_INFO, "Request - method=%s host=%s route=%s", req->method,
+           req->host, req->route);
 }

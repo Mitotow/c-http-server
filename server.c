@@ -29,39 +29,15 @@ void closeOnSignal(int sig) {
   exit(EXIT_SUCCESS);
 }
 
-// Return the corresponding content type
-char *getContentType(const char *ext) {
-  if (strcmp(ext, EXT_HTML) == 0) {
-    return CTYPE_HTML;
-  } else if (strcmp(ext, EXT_JS) == 0) {
-    return CTYPE_JS;
-  } else if (strcmp(ext, EXT_ICO) == 0) {
-    return CTYPE_ICO;
-  }
-
-  return NULL;
-}
-
 // Function in charge of retrieving the file and create the response
 void handleGetFile(request_t req, response_t *res, char *filePath) {
   if (filePath == NULL) {
     createResponse(req, res, NOT_FOUND);
   } else {
     char *ext = getExtension(filePath);
-    if (ext == NULL) {
-      createResponse(req, res, NOT_FOUND);
-      return;
-    }
-
     char *contentType = getContentType(ext);
-    if (contentType == NULL) {
-      createResponse(req, res, NOT_FOUND);
-      return;
-    }
-
     long contentSize;
     char *content = readFile(contentType, filePath, &contentSize);
-
     if (content != NULL) {
       createContentResponse(req, res, contentType, content, contentSize);
     } else {
@@ -91,6 +67,7 @@ int handleClient(void *argument) {
       break;
     }
 
+    // Fetch request content
     request_t req;
     response_t res;
     writeLog(LOG_DEBUG, "Read the retrieved data and setup the request struct");
@@ -113,7 +90,7 @@ int handleClient(void *argument) {
         filePath = getFilePathFromRequest(req);
       } else {
         // Request a configured route
-        // TODO: Implement an handler system in all routes
+        // TODO: Implement an handler system for each route
         writeLog(LOG_DEBUG, "Request a configured route");
         route_t *route;
         if ((route = getRouteByPath(ctx.router, req.route)) != NULL) {
@@ -138,8 +115,8 @@ int handleClient(void *argument) {
       writeLog(LOG_INFO,
                "Response - version=%s status=%d-%s type=%s content-length=%ld "
                "sent=%ld",
-               res.httpVersion, res.statusCode, res.statusName, res.contentType,
-               res.contentLength, bytes_sent);
+               res.httpVersion, res.status.code, res.status.text,
+               res.contentType, res.contentLength, bytes_sent);
     }
 
     memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
@@ -154,6 +131,7 @@ int handleClient(void *argument) {
   return thrd_success;
 }
 
+// Create the server's router
 router_t *createRouter() {
   router_t *router = initRouter();
   addRoute(router, "/", "index.html");
@@ -161,6 +139,7 @@ router_t *createRouter() {
   return router;
 }
 
+// Handle incoming connections
 void handleConnections() {
   while (1) {
     int client_fd;
@@ -204,13 +183,11 @@ int main(int argc, char const *argv[]) {
     writeFatal("Cannot bind address to socket");
   }
 
-  router_t *router = createRouter();
-
   if (listen(server_fd, SOMAXCONN) < 0) {
     writeFatal("Cannot listen to port");
   }
 
-  writeLog(LOG_INFO, "Server listening on port %d", DEFAULT_PORT);
+  router_t *router = createRouter();
 
   ctx.server_fd = server_fd;
   ctx.static_dir = PUBLIC_DIR;
@@ -218,8 +195,10 @@ int main(int argc, char const *argv[]) {
   ctx.addrlen = (socklen_t *)&addrlen;
   ctx.router = router;
 
-  // Handle signal like CTRL+C after the initialization of server ctx
+  // Handle signal like CTRL+C
   signal(SIGINT, closeOnSignal);
+
+  writeLog(LOG_INFO, "Server listening on port %d", DEFAULT_PORT);
 
   handleConnections();
 

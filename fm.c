@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Retrieve file path from a string
 char *getFilePath(char *str) {
   char *path;
   size_t size = strlen(PUBLIC_DIR) + 1 + strlen(str) + 1;
@@ -20,6 +21,7 @@ char *getFilePath(char *str) {
 // Retrieve file path from a request
 char *getFilePathFromRequest(request_t req) { return getFilePath(req.route); }
 
+// Retrieve file path from a route
 char *getFilePathFromRoute(route_t route) {
   return getFilePath(route.fileName);
 }

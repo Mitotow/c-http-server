@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 
+// Send response to client socket
 ssize_t sendResponse(int client_socket, response_t res) {
   char header[RESPONSE_HEADER_SIZE];
   char *cur = header;
@@ -12,7 +13,7 @@ ssize_t sendResponse(int client_socket, response_t res) {
 
   // Add basic headers to the response
   cur += snprintf(cur, end - cur, "%s %d %s\r\n", res.httpVersion,
-                  res.statusCode, res.statusName);
+                  res.status.code, res.status.text);
   cur += snprintf(cur, end - cur, "Connection: %s\r\n", res.connection);
 
   // Add parameters of keep-alive
@@ -68,7 +69,7 @@ void addDefaultHeadersResponse(request_t req, response_t *res) {
 // Create a response
 void createResponse(request_t req, response_t *res, int statusCode) {
   addDefaultHeadersResponse(req, res);
-  res->statusCode = statusCode;
+  res->status = *getStatus(statusCode);
 }
 
 // Create a response that contains content

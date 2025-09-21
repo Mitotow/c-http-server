@@ -9,6 +9,7 @@
 #include <threads.h>
 #include <unistd.h>
 
+// Print in stdout a formatted log
 void print(char *level, char *format, va_list *args) {
   va_list args_cp;
   va_copy(args_cp, *args);
