@@ -35,7 +35,7 @@ void handleGetFile(request_t req, response_t *res, char *filePath) {
     createResponse(req, res, NOT_FOUND);
   } else {
     char *ext = getExtension(filePath);
-    char *contentType = getContentType(ext);
+    char *contentType = (char *)getContentType(ext);
     long contentSize;
     char *content = readFile(contentType, filePath, &contentSize);
     if (content != NULL) {

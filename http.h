@@ -1,3 +1,4 @@
+#include "fm.h"
 #include "router.h"
 #include <sys/socket.h>
 
@@ -26,18 +27,25 @@
 
 #define DEFAULT_STATUS_TEXT ""
 
-// Content-Type
+// Content-Type Text
 #define CTYPE_PLAIN "text/plain"
 #define CTYPE_HTML "text/html"
 #define CTYPE_JS "text/javascript"
 #define CTYPE_CSS "text/css"
 #define CTYPE_CSV "text/csv"
 #define CTYPE_XML "test/xml"
+// Content-Type Image
 #define CTYPE_ICO "image/x-icon"
 #define CTYPE_GIF "image/gif"
 #define CTYPE_JPEG "image/jpeg"
 #define CTYPE_PNG "image/png"
 #define CTYPE_TIFF "image/tiff"
+// Content-Type Font
+#define CTYPE_WOFF "font/woff"
+#define CTYPE_WOFF2 "font/woff2"
+#define CTYPE_TTF "application/x-font-ttf"
+#define CTYPE_OTF "application/x-font-opentype"
+#define CTYPE_EOT "application/vnd.ms-fontobject"
 
 // Connection
 #define CONN_CLOSE "close"
@@ -51,6 +59,11 @@ typedef struct {
   int code;
   const char *text;
 } status_t;
+
+typedef struct {
+  const char *ext;
+  const char *type;
+} content_type_t;
 
 typedef struct {
   int server_fd;
@@ -68,7 +81,18 @@ static const status_t status[] = {
     {INTERNAL_SERVER_ERROR, "Internal Server Error"},
 };
 
+static const content_type_t content_types[] = {
+    {EXT_HTML, CTYPE_HTML},     {EXT_JS, CTYPE_JS},
+    {EXT_CSS, CTYPE_CSS},       {EXT_CSV, CTYPE_CSV},
+    {EXT_XML, CTYPE_XML},       {EXT_ICO, CTYPE_ICO},
+    {EXT_GIF, CTYPE_GIF},       {EXT_JPEG, CTYPE_JPEG},
+    {EXT_JPEG_ALT, CTYPE_JPEG}, {EXT_PNG, CTYPE_PNG},
+    {EXT_TIFF, CTYPE_TIFF},     {EXT_WOFF, CTYPE_WOFF},
+    {EXT_WOFF2, CTYPE_WOFF2},   {EXT_TTF, CTYPE_TTF},
+    {EXT_OTF, CTYPE_OTF},       {EXT_EOT, CTYPE_EOT},
+};
+
 const status_t *getStatus(int code);
-char *getContentType(char *ext);
+const char *getContentType(char *ext);
 
 #endif

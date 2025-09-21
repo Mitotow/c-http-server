@@ -14,31 +14,15 @@ const status_t *getStatus(int code) {
 }
 
 // Return the corresponding content type
-char *getContentType(char *ext) {
+const char *getContentType(char *ext) {
   if (ext == NULL) {
     return CTYPE_PLAIN;
   }
 
-  if (strcmp(ext, EXT_HTML) == 0) {
-    return CTYPE_HTML;
-  } else if (strcmp(ext, EXT_JS) == 0) {
-    return CTYPE_JS;
-  } else if (strcmp(ext, EXT_CSS) == 0) {
-    return CTYPE_CSS;
-  } else if (strcmp(ext, EXT_CSV) == 0) {
-    return CTYPE_CSV;
-  } else if (strcmp(ext, EXT_XML) == 0) {
-    return CTYPE_XML;
-  } else if (strcmp(ext, EXT_ICO) == 0) {
-    return CTYPE_ICO;
-  } else if (strcmp(ext, EXT_GIF) == 0) {
-    return CTYPE_GIF;
-  } else if (strcmp(ext, EXT_JPEG) == 0) {
-    return CTYPE_JPEG;
-  } else if (strcmp(ext, EXT_PNG) == 0) {
-    return CTYPE_PNG;
-  } else if (strcmp(ext, EXT_TIFF) == 0) {
-    return CTYPE_TIFF;
+  for (int i = 0; i < sizeof(content_types) / sizeof(content_types[0]); i++) {
+    if (strcmp(content_types[i].ext, ext) == 0) {
+      return content_types[i].type;
+    }
   }
 
   return CTYPE_PLAIN;
