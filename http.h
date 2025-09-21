@@ -65,14 +65,6 @@ typedef struct {
   const char *type;
 } content_type_t;
 
-typedef struct {
-  int server_fd;
-  char *static_dir;
-  struct sockaddr *address;
-  socklen_t *addrlen;
-  router_t *router;
-} server_context_t;
-
 static const status_t status[] = {
     {OK, "Ok"},
     {CREATED, "Created"},

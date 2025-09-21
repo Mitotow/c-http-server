@@ -1,3 +1,4 @@
+#include "server.h"
 #include "fm.h"
 #include "http.h"
 #include "logger.h"
@@ -5,7 +6,6 @@
 #include "response.h"
 #include "router.h"
 #include <netinet/in.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,21 +13,6 @@
 #include <sys/socket.h>
 #include <threads.h>
 #include <unistd.h>
-
-// Server Parameters
-#define DEFAULT_PORT 8080
-#define DEBUG true
-
-static server_context_t ctx;
-
-// Intercept CTRL+C and close the server's file descriptor
-void closeOnSignal(int sig) {
-  signal(sig, SIG_IGN);
-  close(ctx.server_fd);
-  destroyRouter(ctx.router);
-  writeLog(LOG_INFO, "Server stopped");
-  exit(EXIT_SUCCESS);
-}
 
 // Function in charge of retrieving the file and create the response
 void handleGetFile(request_t req, response_t *res, char *filePath) {
@@ -48,13 +33,13 @@ void handleGetFile(request_t req, response_t *res, char *filePath) {
 
 // Handle communication between server and one client
 int handleClient(void *argument) {
-  int client_socket = (int)(long)argument;
+  handle_client_argument_t *arg = (handle_client_argument_t *)argument;
 
   // Setup timeout
   struct timeval tv;
   tv.tv_sec = KEEP_ALIVE_TIMEOUT;
   tv.tv_usec = 0;
-  setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  setsockopt(arg->client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
   writeLog(LOG_DEBUG, "Handle Client");
 
@@ -62,7 +47,7 @@ int handleClient(void *argument) {
     char buffer[HTTP_REQ_BUFFER_SIZE] = {0};
     ssize_t bytes_read;
 
-    bytes_read = read(client_socket, buffer, sizeof(buffer));
+    bytes_read = read(arg->client_fd, buffer, sizeof(buffer));
     if (bytes_read <= 0) {
       break;
     }
@@ -75,7 +60,7 @@ int handleClient(void *argument) {
     if (!isValidRequest(req)) {
       writeLog(LOG_DEBUG, "Invalid request");
       createResponse(req, &res, BAD_REQUEST);
-      sendResponse(client_socket, res);
+      sendResponse(arg->client_fd, res);
       memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
       continue;
     }
@@ -88,12 +73,12 @@ int handleClient(void *argument) {
         // Request a direct file
         writeLog(LOG_DEBUG, "Request a direct file");
         filePath = getFilePathFromRequest(req);
-      } else {
+      } else if (arg->ctx->router != NULL) {
         // Request a configured route
         // TODO: Implement an handler system for each route
         writeLog(LOG_DEBUG, "Request a configured route");
         route_t *route;
-        if ((route = getRouteByPath(ctx.router, req.route)) != NULL) {
+        if ((route = getRouteByPath(arg->ctx->router, req.route)) != NULL) {
           filePath = getFilePathFromRoute(*route);
         }
       }
@@ -105,12 +90,12 @@ int handleClient(void *argument) {
         createResponse(req, &res, NOT_FOUND);
       }
     } else {
-      // We only handle GET request with this server
+      // We only handle GET request actually
       createResponse(req, &res, BAD_REQUEST);
     }
 
     size_t bytes_sent;
-    if ((bytes_sent = sendResponse(client_socket, res)) < 0) {
+    if ((bytes_sent = sendResponse(arg->client_fd, res)) < 0) {
     } else {
       writeLog(LOG_INFO,
                "Response - version=%s status=%d-%s type=%s content-length=%ld "
@@ -127,32 +112,27 @@ int handleClient(void *argument) {
   }
 
   writeLog(LOG_DEBUG, "Client disconnected");
-  close(client_socket);
+  close(arg->client_fd);
   return thrd_success;
 }
 
-// Create the server's router
-router_t *createRouter() {
-  router_t *router = initRouter();
-  addRoute(router, "/", "index.html");
-
-  return router;
-}
-
 // Handle incoming connections
-void handleConnections() {
+void handleConnections(server_context_t *ctx) {
   while (1) {
     int client_fd;
 
     writeLog(LOG_DEBUG, "Waiting for connections");
-    if ((client_fd = accept(ctx.server_fd, ctx.address, ctx.addrlen)) < 0) {
+    if ((client_fd = accept(ctx->server_fd, ctx->address, ctx->addrlen)) < 0) {
       continue;
     }
 
+    handle_client_argument_t arg;
+    arg.client_fd = client_fd;
+    arg.ctx = ctx;
+
     thrd_t id_thread;
     writeLog(LOG_DEBUG, "Creating thread to handle new client");
-    if (thrd_create(&id_thread, &handleClient, (void *)(long)client_fd) !=
-        thrd_success) {
+    if (thrd_create(&id_thread, &handleClient, (void *)&arg) != thrd_success) {
       close(client_fd);
       continue;
     }
@@ -163,7 +143,8 @@ void handleConnections() {
   }
 }
 
-int main(int argc, char const *argv[]) {
+// Create a server context
+server_context_t *createServer() {
   int server_fd;
   struct sockaddr_in address;
   int addrlen = sizeof(address);
@@ -183,24 +164,37 @@ int main(int argc, char const *argv[]) {
     writeFatal("Cannot bind address to socket");
   }
 
-  if (listen(server_fd, SOMAXCONN) < 0) {
-    writeFatal("Cannot listen to port");
+  server_context_t *ctx = (server_context_t *)malloc(sizeof(server_context_t));
+  ctx->server_fd = server_fd;
+  ctx->static_dir = PUBLIC_DIR;
+  ctx->address = (struct sockaddr *)&address;
+  ctx->addrlen = (socklen_t *)&addrlen;
+
+  return ctx;
+}
+
+// Set the server router
+void setRouter(server_context_t *ctx, router_t *router) {
+  ctx->router = router;
+}
+
+// Make the server listening and run the connection handler
+void runServer(server_context_t *ctx) {
+  if (listen(ctx->server_fd, SOMAXCONN) < 0) {
+    writeFatal("Cannot listen");
   }
 
-  router_t *router = createRouter();
-
-  ctx.server_fd = server_fd;
-  ctx.static_dir = PUBLIC_DIR;
-  ctx.address = (struct sockaddr *)&address;
-  ctx.addrlen = (socklen_t *)&addrlen;
-  ctx.router = router;
-
-  // Handle signal like CTRL+C
-  signal(SIGINT, closeOnSignal);
-
   writeLog(LOG_INFO, "Server listening on port %d", DEFAULT_PORT);
+  handleConnections(ctx);
+}
 
-  handleConnections();
+// Stop server
+void stopServer(server_context_t *ctx) {
+  close(ctx->server_fd);
+  if (ctx->router != NULL) {
+    destroyRouter(ctx->router);
+  }
+  free(ctx);
 
-  return 0;
+  writeLog(LOG_INFO, "Server stopped");
 }

@@ -1,9 +1,8 @@
-#include "http.h"
-#include "request.h"
-#include <stdlib.h>
-
 #ifndef RESPONSE_H
 #define RESPONSE_H
+
+#include "http.h"
+#include "request.h"
 
 #define RESPONSE_HEADER_SIZE 512
 
