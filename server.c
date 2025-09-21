@@ -206,7 +206,7 @@ int main(int argc, char const *argv[]) {
 
   router_t *router = createRouter();
 
-  if (listen(server_fd, 10) < 0) {
+  if (listen(server_fd, SOMAXCONN) < 0) {
     writeFatal("Cannot listen to port");
   }
 
