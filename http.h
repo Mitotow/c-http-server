@@ -19,6 +19,7 @@
 
 // Content-Type
 #define CTYPE_HTML "text/html"
+#define CTYPE_JS "text/javascript"
 #define CTYPE_ICO "image/x-icon"
 
 // Connection

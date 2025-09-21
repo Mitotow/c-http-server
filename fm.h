@@ -6,8 +6,9 @@
 // File
 #define BASE_DIR "."
 #define PUBLIC_DIR "./public/"
-#define EXT_ICO "ico"
 #define EXT_HTML "html"
+#define EXT_JS "js"
+#define EXT_ICO "ico"
 
 char *getFilePathFromRequest(request_t req);
 char *getFilePathFromRoute(route_t route);

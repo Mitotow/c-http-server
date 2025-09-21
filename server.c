@@ -31,10 +31,12 @@ void closeOnSignal(int sig) {
 
 // Return the corresponding content type
 char *getContentType(const char *ext) {
-  if (strcmp(ext, EXT_ICO) == 0) {
-    return CTYPE_ICO;
-  } else if (strcmp(ext, EXT_HTML) == 0) {
+  if (strcmp(ext, EXT_HTML) == 0) {
     return CTYPE_HTML;
+  } else if (strcmp(ext, EXT_JS) == 0) {
+    return CTYPE_JS;
+  } else if (strcmp(ext, EXT_ICO) == 0) {
+    return CTYPE_ICO;
   }
 
   return NULL;
