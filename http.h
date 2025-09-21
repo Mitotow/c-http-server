@@ -27,8 +27,8 @@
 #define CONN_KEEP_ALIVE "keep-alive"
 
 // Keep-Alive
-#define KEEP_ALIVE_TIMEOUT 10 // 5 seconds before timeout
-#define KEEP_ALIVE_MAX 100    // Max requests per session
+#define KEEP_ALIVE_TIMEOUT 5 // 5 seconds before timeout
+#define KEEP_ALIVE_MAX 100   // Max requests per session
 
 typedef struct {
   int server_fd;
