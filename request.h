@@ -1,7 +1,7 @@
+#include <stdbool.h>
+
 #ifndef REQUEST_H
 #define REQUEST_H
-
-#include <stdbool.h>
 
 typedef struct {
   char *method;
@@ -18,7 +18,8 @@ typedef struct {
   char *acceptEncoding;
 } request_t;
 
-bool isValidRequest(request_t req);
+bool isValidRequest(request_t *req);
 void readRequest(char *buffer, request_t *req);
+void destroyRequest(request_t *req);
 
 #endif

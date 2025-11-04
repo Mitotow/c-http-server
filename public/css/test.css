@@ -1,0 +1,18 @@
+div {
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  flex-flow: row nowrap;
+  gap: 3vw;
+
+  justify-content: center;
+  align-items: center;
+}
+
+img {
+  width: 30px;
+  height: auto;
+}

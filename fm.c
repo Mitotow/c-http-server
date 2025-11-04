@@ -6,6 +6,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+long getFileSize(FILE *file, char *path) {
+  bool isFile = (file != NULL);
+  if (!isFile) {
+    file = fopen(path, "rb");
+    if (file == NULL) {
+      return -1;
+    }
+  }
+
+  writeLog(LOG_DEBUG, "Retrieving file size");
+
+  // Retrieve file size
+  fseek(file, 0, SEEK_END);
+  long size = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  writeLog(LOG_DEBUG, "File size : %ld", size);
+
+  if (!isFile)
+    fclose(file);
+
+  return size;
+}
+
 // Retrieve file path from a string
 char *getFilePath(char *str) {
   char *path;
@@ -34,10 +58,13 @@ char *readFile(const char *ctype, const char *path, long *s) {
     return NULL;
   }
 
-  // Retrieve file size
-  fseek(file, 0, SEEK_END);
-  *s = ftell(file);
-  fseek(file, 0, SEEK_SET);
+  *s = getFileSize(file, (char *)path);
+
+  if (*s == -1) {
+    writeLog(LOG_DEBUG, "Path does not exists");
+    fclose(file);
+    return NULL;
+  }
 
   // Alloc buffer for the content
   char *buffer = (char *)malloc(*s);

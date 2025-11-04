@@ -5,6 +5,7 @@
 #include "request.h"
 #include "response.h"
 #include "router.h"
+#include <errno.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,19 +16,79 @@
 #include <unistd.h>
 
 // Function in charge of retrieving the file and create the response
-void handleGetFile(request_t req, response_t *res, char *filePath) {
+void handleGet(request_t req, response_t *res, char *filePath, bool isHead) {
   if (filePath == NULL) {
     createResponse(req, res, NOT_FOUND);
   } else {
     char *ext = getExtension(filePath);
     char *contentType = (char *)getContentType(ext);
     long contentSize;
+
+    if (isHead) {
+      contentSize = getFileSize(NULL, filePath);
+      if (contentSize == -1) {
+        createResponse(req, res, NOT_FOUND);
+      }
+      createContentResponse(req, res, contentType, NULL, contentSize);
+    }
+
     char *content = readFile(contentType, filePath, &contentSize);
     if (content != NULL) {
       createContentResponse(req, res, contentType, content, contentSize);
     } else {
       createResponse(req, res, NOT_FOUND);
     }
+  }
+}
+
+// Retrieve the file path from the request or router if needed
+char *retrieveFilePath(server_context_t *ctx, request_t req) {
+  char *ext = getExtension(req.route);
+  if (ext != NULL) {
+    // Request a direct file
+    writeLog(LOG_DEBUG, "Request a direct file");
+    return getFilePathFromRequest(req);
+  } else if (ctx->router != NULL) {
+    // Request a configured route
+    // TODO: Implement an handler system for each route
+    writeLog(LOG_DEBUG, "Request a configured route");
+    route_t *route;
+    if ((route = getRouteByPath(ctx->router, req.route)) != NULL) {
+      return getFilePathFromRoute(*route);
+    }
+  }
+
+  return NULL;
+}
+
+// Handle request from client
+void handleRequest(handle_client_argument_t *arg, request_t *req,
+                   response_t res) {
+  bool isHead = strcmp(req->method, HTTP_HEAD) == 0;
+  // ONLY FOR GET AND HEAD REQUEST
+  if (strcmp(req->method, HTTP_GET) == 0 || isHead) {
+    char *filePath = retrieveFilePath(arg->ctx, *req);
+    if (filePath != NULL) {
+      handleGet(*req, &res, filePath, isHead);
+      free(filePath);
+    } else {
+      // Route not found
+      createResponse(*req, &res, NOT_FOUND);
+    }
+  } else {
+    // We only handle GET request actually
+    createResponse(*req, &res, BAD_REQUEST);
+  }
+
+  size_t bytes_sent;
+  if ((bytes_sent = sendResponse(arg->client_fd, res)) < 0) {
+    writeLog(LOG_ERROR, "Response FAILED - Requested route = %s", req->route);
+  } else {
+    writeLog(LOG_INFO,
+             "Response - version=%s status=%d-%s type=%s content-length=%ld "
+             "sent=%ld",
+             res.httpVersion, res.status.code, res.status.text, res.contentType,
+             res.contentLength, bytes_sent);
   }
 }
 
@@ -39,7 +100,6 @@ int handleClient(void *argument) {
   struct timeval tv;
   tv.tv_sec = KEEP_ALIVE_TIMEOUT;
   tv.tv_usec = 0;
-  setsockopt(arg->client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
   writeLog(LOG_DEBUG, "Handle Client");
 
@@ -47,72 +107,55 @@ int handleClient(void *argument) {
     char buffer[HTTP_REQ_BUFFER_SIZE] = {0};
     ssize_t bytes_read;
 
-    bytes_read = read(arg->client_fd, buffer, sizeof(buffer));
+    setsockopt(arg->client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    bytes_read = recv(arg->client_fd, buffer, sizeof(buffer) - 1, 0);
     if (bytes_read <= 0) {
+      if (bytes_read == 0) {
+        writeLog(LOG_DEBUG, "Client close connection");
+      } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        writeLog(LOG_DEBUG, "Connection timed out");
+      } else {
+        writeLog(LOG_ERROR, "Read error");
+      }
+
       break;
     }
 
     // Fetch request content
-    request_t req;
-    response_t res;
+    request_t *req = (request_t *)calloc(1, sizeof(request_t));
+    response_t *res = (response_t *)calloc(1, sizeof(response_t));
     writeLog(LOG_DEBUG, "Read the retrieved data and setup the request struct");
-    readRequest(buffer, &req);
+    readRequest(buffer, req);
     if (!isValidRequest(req)) {
       writeLog(LOG_DEBUG, "Invalid request");
-      createResponse(req, &res, BAD_REQUEST);
-      sendResponse(arg->client_fd, res);
+      createResponse(*req, res, BAD_REQUEST);
+      sendResponse(arg->client_fd, *res);
       memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
+      destroyRequest(req);
+      free(res);
       continue;
     }
 
-    // ONLY FOR GET REQUEST
-    if (strcmp(req.method, HTTP_GET) == 0) {
-      char *ext = getExtension(req.route);
-      char *filePath;
-      if (ext != NULL) {
-        // Request a direct file
-        writeLog(LOG_DEBUG, "Request a direct file");
-        filePath = getFilePathFromRequest(req);
-      } else if (arg->ctx->router != NULL) {
-        // Request a configured route
-        // TODO: Implement an handler system for each route
-        writeLog(LOG_DEBUG, "Request a configured route");
-        route_t *route;
-        if ((route = getRouteByPath(arg->ctx->router, req.route)) != NULL) {
-          filePath = getFilePathFromRoute(*route);
-        }
-      }
+    writeLog(LOG_INFO, "Request - method=%s conn=%s host=%s route=%s",
+             req->method, req->connection, req->host, req->route);
 
-      if (filePath != NULL) {
-        handleGetFile(req, &res, filePath);
-        free(filePath);
-      } else {
-        createResponse(req, &res, NOT_FOUND);
-      }
-    } else {
-      // We only handle GET request actually
-      createResponse(req, &res, BAD_REQUEST);
-    }
-
-    size_t bytes_sent;
-    if ((bytes_sent = sendResponse(arg->client_fd, res)) < 0) {
-    } else {
-      writeLog(LOG_INFO,
-               "Response - version=%s status=%d-%s type=%s content-length=%ld "
-               "sent=%ld",
-               res.httpVersion, res.status.code, res.status.text,
-               res.contentType, res.contentLength, bytes_sent);
-    }
+    handleRequest(arg, req, *res);
 
     memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
 
-    if (strcmp(res.connection, CONN_CLOSE) == 0) {
+    bool isClosed =
+        req->connection == NULL || strcmp(req->connection, CONN_CLOSE) == 0;
+
+    destroyRequest(req);
+    free(res);
+
+    if (isClosed)
       break;
-    }
   }
 
   writeLog(LOG_DEBUG, "Client disconnected");
   close(arg->client_fd);
+  free(arg);
   return thrd_success;
 }
 
@@ -122,22 +165,21 @@ void handleConnections(server_context_t *ctx) {
     int client_fd;
 
     writeLog(LOG_DEBUG, "Waiting for connections");
-    if ((client_fd = accept(ctx->server_fd, ctx->address, ctx->addrlen)) < 0) {
+    if ((client_fd = accept(ctx->server_fd, ctx->address, &ctx->addrlen)) < 0) {
       continue;
     }
 
-    handle_client_argument_t arg;
-    arg.client_fd = client_fd;
-    arg.ctx = ctx;
+    handle_client_argument_t *arg = malloc(sizeof(handle_client_argument_t));
+    arg->client_fd = client_fd;
+    arg->ctx = ctx;
 
     thrd_t id_thread;
     writeLog(LOG_DEBUG, "Creating thread to handle new client");
-    if (thrd_create(&id_thread, &handleClient, (void *)&arg) != thrd_success) {
+    if (thrd_create(&id_thread, &handleClient, (void *)arg) != thrd_success) {
       close(client_fd);
+      free(arg);
       continue;
     }
-
-    writeLog(LOG_INFO, "Handling new client");
 
     thrd_detach(id_thread);
   }
@@ -147,7 +189,6 @@ void handleConnections(server_context_t *ctx) {
 server_context_t *createServer() {
   int server_fd;
   struct sockaddr_in address;
-  int addrlen = sizeof(address);
 
   // Creating socket file descriptor
   if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -168,7 +209,7 @@ server_context_t *createServer() {
   ctx->server_fd = server_fd;
   ctx->static_dir = PUBLIC_DIR;
   ctx->address = (struct sockaddr *)&address;
-  ctx->addrlen = (socklen_t *)&addrlen;
+  ctx->addrlen = sizeof(address);
 
   return ctx;
 }

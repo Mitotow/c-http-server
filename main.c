@@ -17,6 +17,8 @@ void handleSignal(int sig) {
 router_t *createRouter() {
   router_t *router = initRouter();
   addRoute(router, "/", "index.html");
+  addRoute(router, "/hello", "hello.html");
+  addRoute(router, "/test", "test/test.html");
 
   return router;
 }

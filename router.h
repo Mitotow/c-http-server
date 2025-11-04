@@ -1,7 +1,8 @@
+#include "request.h"
+#include <stdlib.h>
+
 #ifndef ROUTER_H
 #define ROUTER_H
-
-#include <stdlib.h>
 
 typedef struct {
   char *path;

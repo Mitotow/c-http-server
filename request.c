@@ -1,61 +1,55 @@
 #include "request.h"
 #include "http.h"
-#include "logger.h"
 #include <string.h>
 
 // Fetch the HTTP request header to setup the request struct
 void fetchRequestHeader(char *token, request_t *req) {
   int index = 0;
   char *rest = token;
+  char *tokens[3] = {NULL, NULL, NULL};
 
   while ((token = strtok_r(rest, " ", &rest))) {
-    switch (index) {
-    case 0:
-      req->method = token;
-      break;
-    case 1:
-      req->route = token;
-      break;
-    case 2:
-      req->httpVersion = token;
-      break;
-    }
-
+    tokens[index] = token;
     index++;
   }
 
-  if (req->httpVersion == NULL) {
-    req->httpVersion = HTTP_DEFAULT_VERSION;
+  if (tokens[0] != NULL)
+    req->method = strdup(tokens[0]);
+  if (tokens[1] != NULL)
+    req->route = strdup(tokens[1]);
+  if (tokens[2] != NULL)
+    req->httpVersion = strdup(tokens[2]);
+
+  if (req->connection == NULL) {
+    if (strcmp(req->httpVersion, HTTP_1_0)) {
+      req->connection = strdup(CONN_CLOSE);
+    } else {
+      req->connection = strdup(CONN_KEEP_ALIVE);
+    }
   }
 }
 
 // Fetch the HTTP request content to setupt the request struct
 void fetchRequestContent(char *token, request_t *req) {
   char *rest = token;
-  char *oldToken = NULL;
+  char *key = strtok_r(rest, ": ", &rest);
+  if (key == NULL)
+    return;
 
-  while ((token = strtok_r(rest, ": ", &rest))) {
-    if (oldToken == NULL) {
-      oldToken = token;
-    } else {
-      if (strcmp(oldToken, "Host") == 0) {
-        req->host = token;
-      } else if (strcmp(oldToken, "User-Agent") == 0) {
-        req->userAgent = token;
-      } else if (strcmp(oldToken, "Accept") == 0) {
-        req->accept = token;
-      } else if (strcmp(oldToken, "Connection") == 0) {
-        req->connection = token;
-      } else if (strcmp(oldToken, "Content-Type") == 0) {
-        req->contentType = token;
-      } else if (strcmp(oldToken, "Content-Length") == 0) {
-        // TODO: Check if token is a valid number
-      }
+  char *value = strtok_r(NULL, "", &rest);
+  if (value == NULL)
+    return;
 
-      // token is only one line of the request,
-      // we don't continue the process
-      break;
-    }
+  if (strcmp(key, "Host") == 0) {
+    req->host = strdup(value);
+  } else if (strcmp(key, "User-Agent") == 0) {
+    req->userAgent = strdup(value);
+  } else if (strcmp(key, "Accept") == 0) {
+    req->accept = strdup(value);
+  } else if (strcmp(key, "Connection") == 0) {
+    req->connection = strdup(value);
+  } else if (strcmp(key, "Content-Type") == 0) {
+    req->contentType = strdup(value);
   }
 }
 
@@ -69,21 +63,24 @@ void readRequestLine(char *token, request_t *req, bool isHeader) {
 }
 
 // Check if every required parameters are given in a request
-bool isValidRequest(request_t req) {
+bool isValidRequest(request_t *req) {
+  if (req == NULL)
+    return false;
+
   // Check the presence of default HTTP Headers
-  if (req.method == NULL || req.route == NULL || req.httpVersion == NULL) {
+  if (req->method == NULL || req->route == NULL || req->httpVersion == NULL) {
     return false;
   }
 
   // Check if the host argument is present
-  if (req.host == NULL) {
+  if (req->host == NULL) {
     return false;
   }
 
   // Check if the content is well initialized (with contentType and
-  // contentLegnth)
-  if (req.content != NULL && req.contentLength == 0L &&
-      req.contentType == NULL) {
+  // contentLength)
+  if (req->content != NULL && req->contentLength == 0L &&
+      req->contentType == NULL) {
     return false;
   }
 
@@ -93,37 +90,72 @@ bool isValidRequest(request_t req) {
 // Normalize the request path to avoid security problems
 void normalizeRequestRoute(request_t *req) {
   if (req->route == NULL || req->route[0] == '\0') {
-    req->route = "/";
+    free(req->route);
+    req->route = strdup("/");
     return;
   }
-
-  // Route must start by /
   if (req->route[0] != '/') {
-    req->route = strchr(req->route, '/');
+    char *slash = strchr(req->route, '/');
+    if (slash != NULL) {
+      free(req->route);
+      req->route = strdup(slash);
+    }
   }
 }
 
 // Read HTTP request
 void readRequest(char *buffer, request_t *req) {
   bool isHeader = true;
-
-  // Parse Http Request
-  char *token;
   char *rest = strdup(buffer);
+  char *rest_ptr = rest;
+  char *token;
   while ((token = strtok_r(rest, HTTP_DELIMITER, &rest))) {
     char *cp = strdup(token);
     if (strlen(token) == 0) {
-      strcpy(req->content, rest);
+      strncpy(req->content, rest, sizeof(req->content) - 1);
+      req->content[sizeof(req->content) - 1] = '\0';
       break;
     }
-
     readRequestLine(cp, req, isHeader);
-    if (isHeader) {
+    if (isHeader)
       isHeader = false;
-    }
+    free(cp);
   }
+  free(rest_ptr);
 
   normalizeRequestRoute(req);
-  writeLog(LOG_INFO, "Request - method=%s host=%s route=%s", req->method,
-           req->host, req->route);
+}
+
+// Free all of the elements inside the request and the request itself
+void destroyRequest(request_t *req) {
+  if (req == NULL) {
+    return;
+  }
+
+  if (req->method != NULL) {
+    free(req->method);
+  }
+  if (req->route != NULL) {
+    free(req->route);
+  }
+  if (req->httpVersion != NULL) {
+    free(req->httpVersion);
+  }
+  if (req->host != NULL) {
+    free(req->host);
+  }
+  if (req->userAgent != NULL) {
+    free(req->userAgent);
+  }
+  if (req->accept != NULL) {
+    free(req->accept);
+  }
+  if (req->connection != NULL) {
+    free(req->connection);
+  }
+  if (req->contentType != NULL) {
+    free(req->contentType);
+  }
+
+  free(req);
 }

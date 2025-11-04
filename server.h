@@ -1,8 +1,8 @@
-#ifndef SERVER_H
-#define SERVER_H
-
 #include "router.h"
 #include <sys/socket.h>
+
+#ifndef SERVER_H
+#define SERVER_H
 
 // Server Parameters
 #define DEFAULT_PORT 8080
@@ -12,7 +12,7 @@ typedef struct {
   int server_fd;
   char *static_dir;
   struct sockaddr *address;
-  socklen_t *addrlen;
+  socklen_t addrlen;
   router_t *router;
 } server_context_t;
 

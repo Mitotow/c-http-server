@@ -1,9 +1,8 @@
-#ifndef RESPONSE_H
-#define RESPONSE_H
-
 #include "http.h"
 #include "request.h"
 
+#ifndef RESPONSE_H
+#define RESPONSE_H
 #define RESPONSE_HEADER_SIZE 512
 
 typedef struct {

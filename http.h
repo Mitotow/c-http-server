@@ -13,6 +13,7 @@
 #define HTTP_1_0 "HTTP/1.0"
 
 // HTTP Methods
+#define HTTP_HEAD "HEAD"
 #define HTTP_GET "GET"
 #define HTTP_POST "POST"
 #define HTTP_PUT "PUT"
@@ -40,6 +41,7 @@
 #define CTYPE_JPEG "image/jpeg"
 #define CTYPE_PNG "image/png"
 #define CTYPE_TIFF "image/tiff"
+#define CTYPE_SVG "image/svg+xml"
 // Content-Type Font
 #define CTYPE_WOFF "font/woff"
 #define CTYPE_WOFF2 "font/woff2"
@@ -79,9 +81,10 @@ static const content_type_t content_types[] = {
     {EXT_XML, CTYPE_XML},       {EXT_ICO, CTYPE_ICO},
     {EXT_GIF, CTYPE_GIF},       {EXT_JPEG, CTYPE_JPEG},
     {EXT_JPEG_ALT, CTYPE_JPEG}, {EXT_PNG, CTYPE_PNG},
-    {EXT_TIFF, CTYPE_TIFF},     {EXT_WOFF, CTYPE_WOFF},
-    {EXT_WOFF2, CTYPE_WOFF2},   {EXT_TTF, CTYPE_TTF},
-    {EXT_OTF, CTYPE_OTF},       {EXT_EOT, CTYPE_EOT},
+    {EXT_TIFF, CTYPE_TIFF},     {EXT_SVG, CTYPE_SVG},
+    {EXT_WOFF, CTYPE_WOFF},     {EXT_WOFF2, CTYPE_WOFF2},
+    {EXT_TTF, CTYPE_TTF},       {EXT_OTF, CTYPE_OTF},
+    {EXT_EOT, CTYPE_EOT},
 };
 
 const status_t *getStatus(int code);

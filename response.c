@@ -1,5 +1,6 @@
 #include "response.h"
 #include "http.h"
+#include "logger.h"
 #include "request.h"
 #include <stdio.h>
 #include <string.h>
