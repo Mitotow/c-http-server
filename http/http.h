@@ -1,5 +1,6 @@
-#include "fm.h"
-#include "router.h"
+#include "../lib/filesystem.h"
+#include "../router.h"
+#include <stdbool.h>
 #include <sys/socket.h>
 
 #ifndef HTTP_H
@@ -28,7 +29,8 @@
 
 #define DEFAULT_STATUS_TEXT ""
 
-// Content-Type Text
+// Content-Type text
+#define CTYPE_TEXT_PREFIX "text/"
 #define CTYPE_PLAIN "text/plain"
 #define CTYPE_HTML "text/html"
 #define CTYPE_JS "text/javascript"
@@ -89,5 +91,6 @@ static const content_type_t content_types[] = {
 
 const status_t *getStatus(int code);
 const char *getContentType(char *ext);
+bool isTextContentType(char *ctype);
 
 #endif

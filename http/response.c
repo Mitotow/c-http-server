@@ -1,33 +1,32 @@
 #include "response.h"
 #include "http.h"
-#include "logger.h"
 #include "request.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 
 // Send response to client socket
-ssize_t sendResponse(int client_socket, response_t res) {
+ssize_t sendResponse(int client_socket, response_t *res) {
   char header[RESPONSE_HEADER_SIZE];
   char *cur = header;
   char *const end = header + sizeof(header);
 
   // Add basic headers to the response
-  cur += snprintf(cur, end - cur, "%s %d %s\r\n", res.httpVersion,
-                  res.status.code, res.status.text);
-  cur += snprintf(cur, end - cur, "Connection: %s\r\n", res.connection);
+  cur += snprintf(cur, end - cur, "%s %d %s\r\n", res->httpVersion,
+                  res->status.code, res->status.text);
+  cur += snprintf(cur, end - cur, "Connection: %s\r\n", res->connection);
 
   // Add parameters of keep-alive
-  if (strcmp(res.connection, CONN_KEEP_ALIVE) == 0) {
+  if (strcmp(res->connection, CONN_KEEP_ALIVE) == 0) {
     cur += snprintf(cur, end - cur, "Keep-Alive: timeout=%d, max=%d\r\n",
                     KEEP_ALIVE_TIMEOUT, KEEP_ALIVE_MAX);
   }
 
   // Add information about the response content
-  if (res.content != NULL) {
+  if (res->content != NULL) {
     cur +=
         snprintf(cur, end - cur, "Content-Length: %ld\r\nContent-Type: %s\r\n",
-                 res.contentLength, res.contentType);
+                 res->contentLength, res->contentType);
   }
 
   cur += snprintf(cur, end - cur, "\r\n");
@@ -38,9 +37,9 @@ ssize_t sendResponse(int client_socket, response_t res) {
   }
 
   // Send the content separately if present
-  if (res.content != NULL) {
+  if (res->content != NULL) {
     ssize_t content_sent =
-        send(client_socket, res.content, res.contentLength, 0);
+        send(client_socket, res->content, res->contentLength, 0);
     if (content_sent < 0) {
       return content_sent;
     }
@@ -51,10 +50,10 @@ ssize_t sendResponse(int client_socket, response_t res) {
 }
 
 // Create basic headers of a response
-void addDefaultHeadersResponse(request_t req, response_t *res) {
-  char *connection = req.connection;
+void addDefaultHeadersResponse(request_t *req, response_t *res) {
+  char *connection = req->connection;
   if (connection == NULL) {
-    if (strcmp(req.httpVersion, HTTP_1_0)) {
+    if (strcmp(req->httpVersion, HTTP_1_0)) {
       connection = CONN_CLOSE;
     } else {
       connection = CONN_KEEP_ALIVE;
@@ -63,21 +62,26 @@ void addDefaultHeadersResponse(request_t req, response_t *res) {
 
   // TODO : Add the Date header in the response
 
-  res->httpVersion = req.httpVersion;
+  res->httpVersion = req->httpVersion;
   res->connection = connection;
 }
 
 // Create a response
-void createResponse(request_t req, response_t *res, int statusCode) {
+response_t *createResponse(request_t *req, int statusCode) {
+  response_t *res = (response_t *)calloc(1, sizeof(response_t));
   addDefaultHeadersResponse(req, res);
   res->status = *getStatus(statusCode);
+
+  return res;
 }
 
 // Create a response that contains content
-void createContentResponse(request_t req, response_t *res, char *contentType,
-                           char *content, long length) {
-  createResponse(req, res, 200);
+response_t *createContentResponse(request_t *req, char *contentType,
+                                  char *content, long length) {
+  response_t *res = createResponse(req, 200);
   res->contentType = contentType;
   res->contentLength = length;
   res->content = content;
+
+  return res;
 }

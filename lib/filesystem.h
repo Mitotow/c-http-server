@@ -1,13 +1,12 @@
-#include "request.h"
-#include "router.h"
+#include <stdbool.h>
 #include <stdio.h>
 
-#ifndef FM_H
-#define FM_H
+#ifndef FILESYSTEM_H
+#define FILESYSTEM_H
 
 // Path
 #define BASE_DIR "."
-#define PUBLIC_DIR "./public/"
+#define PUBLIC_DIR "./public"
 
 // Extensions
 #define EXT_HTML "html"
@@ -28,10 +27,10 @@
 #define EXT_OTF "otf"
 #define EXT_EOT "eot"
 
-long getFileSize(FILE *file, char *path);
-char *getFilePathFromRequest(request_t req);
-char *getFilePathFromRoute(route_t route);
-char *readFile(const char *ctype, const char *path, long *s);
-char *getExtension(const char *path);
+long getFileSizeFromPath(char *path);
+char *readFile(char *path, long *size);
+char *readTextFile(char *path, long *size);
+char *getExtension(char *path);
+char *getFilePath(char *path);
 
 #endif

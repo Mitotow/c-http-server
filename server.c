@@ -1,13 +1,14 @@
 #include "server.h"
-#include "fm.h"
-#include "http.h"
-#include "logger.h"
-#include "request.h"
-#include "response.h"
+#include "http/http.h"
+#include "http/request.h"
+#include "http/response.h"
+#include "lib/filesystem.h"
+#include "lib/logger.h"
 #include "router.h"
 #include <errno.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,45 +17,55 @@
 #include <unistd.h>
 
 // Function in charge of retrieving the file and create the response
-void handleGet(request_t req, response_t *res, char *filePath, bool isHead) {
+response_t *handleGet(request_t *req, char *filePath, bool isHead) {
+  response_t *res;
   if (filePath == NULL) {
-    createResponse(req, res, NOT_FOUND);
+    res = createResponse(req, NOT_FOUND);
   } else {
     char *ext = getExtension(filePath);
     char *contentType = (char *)getContentType(ext);
     long contentSize;
 
     if (isHead) {
-      contentSize = getFileSize(NULL, filePath);
+      contentSize = getFileSizeFromPath(filePath);
       if (contentSize == -1) {
-        createResponse(req, res, NOT_FOUND);
+        res = createResponse(req, NOT_FOUND);
+      } else {
+        res = createContentResponse(req, contentType, NULL, contentSize);
       }
-      createContentResponse(req, res, contentType, NULL, contentSize);
     }
 
-    char *content = readFile(contentType, filePath, &contentSize);
-    if (content != NULL) {
-      createContentResponse(req, res, contentType, content, contentSize);
+    char *content;
+    if (isTextContentType(contentType)) {
+      content = readTextFile(filePath, &contentSize);
     } else {
-      createResponse(req, res, NOT_FOUND);
+      content = readFile(filePath, &contentSize);
+    }
+
+    if (content != NULL && contentSize > 0) {
+      res = createContentResponse(req, contentType, content, contentSize);
+    } else {
+      res = createResponse(req, NOT_FOUND);
     }
   }
+
+  return res;
 }
 
 // Retrieve the file path from the request or router if needed
-char *retrieveFilePath(server_context_t *ctx, request_t req) {
+char *getFilePathFromRequest(server_context_t *ctx, request_t req) {
   char *ext = getExtension(req.route);
   if (ext != NULL) {
     // Request a direct file
     writeLog(LOG_DEBUG, "Request a direct file");
-    return getFilePathFromRequest(req);
+    return getFilePath(req.route);
   } else if (ctx->router != NULL) {
     // Request a configured route
     // TODO: Implement an handler system for each route
     writeLog(LOG_DEBUG, "Request a configured route");
     route_t *route;
     if ((route = getRouteByPath(ctx->router, req.route)) != NULL) {
-      return getFilePathFromRoute(*route);
+      return getFilePath(route->fileName);
     }
   }
 
@@ -62,34 +73,25 @@ char *retrieveFilePath(server_context_t *ctx, request_t req) {
 }
 
 // Handle request from client
-void handleRequest(handle_client_argument_t *arg, request_t *req,
-                   response_t res) {
+response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
   bool isHead = strcmp(req->method, HTTP_HEAD) == 0;
   // ONLY FOR GET AND HEAD REQUEST
+  response_t *res;
   if (strcmp(req->method, HTTP_GET) == 0 || isHead) {
-    char *filePath = retrieveFilePath(arg->ctx, *req);
+    char *filePath = getFilePathFromRequest(arg->ctx, *req);
     if (filePath != NULL) {
-      handleGet(*req, &res, filePath, isHead);
+      res = handleGet(req, filePath, isHead);
       free(filePath);
     } else {
       // Route not found
-      createResponse(*req, &res, NOT_FOUND);
+      res = createResponse(req, NOT_FOUND);
     }
   } else {
     // We only handle GET request actually
-    createResponse(*req, &res, BAD_REQUEST);
+    res = createResponse(req, BAD_REQUEST);
   }
 
-  size_t bytes_sent;
-  if ((bytes_sent = sendResponse(arg->client_fd, res)) < 0) {
-    writeLog(LOG_ERROR, "Response FAILED - Requested route = %s", req->route);
-  } else {
-    writeLog(LOG_INFO,
-             "Response - version=%s status=%d-%s type=%s content-length=%ld "
-             "sent=%ld",
-             res.httpVersion, res.status.code, res.status.text, res.contentType,
-             res.contentLength, bytes_sent);
-  }
+  return res;
 }
 
 // Handle communication between server and one client
@@ -122,14 +124,12 @@ int handleClient(void *argument) {
     }
 
     // Fetch request content
-    request_t *req = (request_t *)calloc(1, sizeof(request_t));
-    response_t *res = (response_t *)calloc(1, sizeof(response_t));
     writeLog(LOG_DEBUG, "Read the retrieved data and setup the request struct");
-    readRequest(buffer, req);
+    request_t *req = createRequest(buffer);
     if (!isValidRequest(req)) {
       writeLog(LOG_DEBUG, "Invalid request");
-      createResponse(*req, res, BAD_REQUEST);
-      sendResponse(arg->client_fd, *res);
+      response_t *res = createResponse(req, BAD_REQUEST);
+      sendResponse(arg->client_fd, res);
       memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
       destroyRequest(req);
       free(res);
@@ -139,12 +139,24 @@ int handleClient(void *argument) {
     writeLog(LOG_INFO, "Request - method=%s conn=%s host=%s route=%s",
              req->method, req->connection, req->host, req->route);
 
-    handleRequest(arg, req, *res);
+    response_t *res = handleRequest(arg, req);
 
     memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
 
     bool isClosed =
         req->connection == NULL || strcmp(req->connection, CONN_CLOSE) == 0;
+
+    // SEND RESPONSE TO CLIENT
+    size_t bytes_sent;
+    if ((bytes_sent = sendResponse(arg->client_fd, res)) < 0) {
+      writeLog(LOG_ERROR, "Response FAILED - Requested route = %s", req->route);
+    } else {
+      writeLog(LOG_INFO,
+               "Response - version=%s status=%d-%s type=%s content-length=%ld "
+               "sent=%ld",
+               res->httpVersion, res->status.code, res->status.text,
+               res->contentType, res->contentLength, bytes_sent);
+    }
 
     destroyRequest(req);
     free(res);
@@ -165,7 +177,8 @@ void handleConnections(server_context_t *ctx) {
     int client_fd;
 
     writeLog(LOG_DEBUG, "Waiting for connections");
-    if ((client_fd = accept(ctx->server_fd, ctx->address, &ctx->addrlen)) < 0) {
+    if ((client_fd = accept(ctx->server_fd, &ctx->address, &ctx->addrlen)) <
+        0) {
       continue;
     }
 
@@ -186,9 +199,10 @@ void handleConnections(server_context_t *ctx) {
 }
 
 // Create a server context
-server_context_t *createServer() {
+server_context_t *createServer(config_t *config) {
   int server_fd;
   struct sockaddr_in address;
+  uint16_t port = config->port;
 
   // Creating socket file descriptor
   if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -197,25 +211,30 @@ server_context_t *createServer() {
 
   address.sin_family = AF_INET;
   address.sin_addr.s_addr = INADDR_ANY;
-  address.sin_port = htons(DEFAULT_PORT);
+  address.sin_port = htons(port);
 
   memset(address.sin_zero, '\0', sizeof address.sin_zero);
-
-  if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-    writeFatal("Cannot bind address to socket");
-  }
 
   server_context_t *ctx = (server_context_t *)malloc(sizeof(server_context_t));
   ctx->server_fd = server_fd;
   ctx->static_dir = PUBLIC_DIR;
-  ctx->address = (struct sockaddr *)&address;
+  ctx->address = *(struct sockaddr *)&address;
   ctx->addrlen = sizeof(address);
+  ctx->config = config;
 
   return ctx;
 }
 
+int bindServer(server_context_t *ctx) {
+  return bind(ctx->server_fd, &ctx->address, sizeof(ctx->address));
+}
+
 // Set the server router
 void setRouter(server_context_t *ctx, router_t *router) {
+  if (bindServer(ctx) < 0) {
+    writeFatal("Cannot bind server");
+  }
+
   ctx->router = router;
 }
 
@@ -225,7 +244,8 @@ void runServer(server_context_t *ctx) {
     writeFatal("Cannot listen");
   }
 
-  writeLog(LOG_INFO, "Server listening on port %d", DEFAULT_PORT);
+  writeLog(LOG_DEBUG, "Server listening on port %d", ctx->config->port);
+
   handleConnections(ctx);
 }
 

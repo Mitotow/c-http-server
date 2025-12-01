@@ -1,5 +1,4 @@
 #include "http.h"
-#include "fm.h"
 #include <string.h>
 
 // Get a status by its code
@@ -26,4 +25,19 @@ const char *getContentType(char *ext) {
   }
 
   return CTYPE_PLAIN;
+}
+
+// Check if content type is text
+bool isTextContentType(char *ctype) {
+  if (strlen(ctype) < 5) {
+    return false;
+  }
+
+  for (int i = 0; i < 5; i++) {
+    if (ctype[i] != CTYPE_TEXT_PREFIX[i]) {
+      return false;
+    }
+  }
+
+  return true;
 }

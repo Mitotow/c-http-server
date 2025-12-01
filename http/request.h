@@ -19,7 +19,7 @@ typedef struct {
 } request_t;
 
 bool isValidRequest(request_t *req);
-void readRequest(char *buffer, request_t *req);
+request_t *createRequest(char *buffer);
 void destroyRequest(request_t *req);
 
 #endif
