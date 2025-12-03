@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 
 // Send response to client socket
 ssize_t sendResponse(int client_socket, response_t *res) {
@@ -14,6 +15,8 @@ ssize_t sendResponse(int client_socket, response_t *res) {
   // Add basic headers to the response
   cur += snprintf(cur, end - cur, "%s %d %s\r\n", res->httpVersion,
                   res->status.code, res->status.text);
+  cur += snprintf(cur, end - cur, "Date: %s\r\n", res->date);
+  cur += snprintf(cur, end - cur, "Server: %s\r\n", SERVER_NAME);
   cur += snprintf(cur, end - cur, "Connection: %s\r\n", res->connection);
 
   // Add parameters of keep-alive
@@ -49,6 +52,24 @@ ssize_t sendResponse(int client_socket, response_t *res) {
   return sent;
 }
 
+// Get date for Date header
+char *getDate() {
+  char *date_buffer = malloc(RESPONSE_DATE_SIZE);
+  time_t t;
+  struct tm *gmt;
+
+  time(&t);
+  gmt = gmtime(&t);
+
+  if (gmt == NULL) {
+    free(date_buffer);
+    return NULL;
+  }
+
+  strftime(date_buffer, RESPONSE_DATE_SIZE, "%a, %d %b %Y %H:%M:%S GMT", gmt);
+  return date_buffer;
+}
+
 // Create basic headers of a response
 void addDefaultHeadersResponse(request_t *req, response_t *res) {
   char *connection = req->connection;
@@ -60,8 +81,7 @@ void addDefaultHeadersResponse(request_t *req, response_t *res) {
     }
   }
 
-  // TODO : Add the Date header in the response
-
+  res->date = getDate();
   res->httpVersion = req->httpVersion;
   res->connection = connection;
 }
@@ -70,7 +90,12 @@ void addDefaultHeadersResponse(request_t *req, response_t *res) {
 response_t *createResponse(request_t *req, int statusCode) {
   response_t *res = (response_t *)calloc(1, sizeof(response_t));
   addDefaultHeadersResponse(req, res);
-  res->status = *getStatus(statusCode);
+  const status_t *status = getStatus(statusCode);
+  if (status != NULL) {
+    res->status = *status;
+  } else {
+    res->status = *getStatus(INTERNAL_SERVER_ERROR);
+  }
 
   return res;
 }
@@ -84,4 +109,12 @@ response_t *createContentResponse(request_t *req, char *contentType,
   res->content = content;
 
   return res;
+}
+
+void destroyResponse(response_t *res) {
+  if (res) {
+    if (res->date)
+      free(res->date);
+    free(res);
+  }
 }

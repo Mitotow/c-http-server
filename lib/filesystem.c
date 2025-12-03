@@ -1,4 +1,7 @@
 #include "filesystem.h"
+#include "../utils/strutils.h"
+#include "logger.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,6 +31,9 @@ long getFileSizeFromPath(char *path) {
 // Read file and return its content
 char *readFile(char *path, long *size) {
   FILE *file = fopen(path, "rb"); // Open file in read byte mode
+  if (!file) {
+    return NULL;
+  }
 
   char *buffer = NULL;
   size_t bytes_read = -1;
@@ -43,10 +49,7 @@ char *readFile(char *path, long *size) {
     }
   }
 
-  if (file != NULL) {
-    fclose(file);
-  }
-
+  fclose(file);
   *size = fileSize;
   return buffer;
 }
@@ -72,14 +75,53 @@ char *getExtension(char *path) {
 }
 
 // Retrieve file path from a string
-char *getFilePath(char *str) {
+char *getFilePath(server_context_t *ctx, char *str) {
   char *path;
-  size_t size = strlen(PUBLIC_DIR) + 1 + strlen(str) + 1;
+  size_t size = ctx->config->base_href_length + 1 + strlen(str) + 1;
   path = (char *)malloc(size);
 
-  strcpy(path, PUBLIC_DIR);
+  strcpy(path, ctx->config->base_href);
   strcat(path, str);
 
-  printf("path : %s\n", path);
   return path;
+}
+
+char *getAbsolutePath(char *path) {
+  char *resolved_path = malloc(sizeof(char) * PATH_MAX);
+  char *strcp = strdup(path);
+  strrm(strcp, '\n');
+  if (realpath(strcp, resolved_path) == NULL) {
+    free(resolved_path);
+    return NULL;
+  }
+
+  free(strcp);
+  return resolved_path;
+}
+
+// Check if path exists and result is inside context base href
+bool is_valid_path(server_context_t *ctx, char *path) {
+  // Will always point to base_href
+  if (path == NULL)
+    return true;
+
+  char *ptr;
+  ptr = getAbsolutePath(path);
+  if (ptr == NULL) {
+    return false;
+  }
+
+  // Check if path starts with base href
+  bool is_valid = strlen(ptr) > ctx->config->base_href_length;
+  if (is_valid) {
+    for (uint16_t i = 0; i < ctx->config->base_href_length; i++) {
+      if (ptr[i] != ctx->config->base_href[i]) {
+        is_valid = false;
+        break;
+      }
+    }
+  }
+
+  free(ptr);
+  return is_valid;
 }

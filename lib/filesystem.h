@@ -1,3 +1,4 @@
+#include "../server.h"
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -31,6 +32,8 @@ long getFileSizeFromPath(char *path);
 char *readFile(char *path, long *size);
 char *readTextFile(char *path, long *size);
 char *getExtension(char *path);
-char *getFilePath(char *path);
+char *getFilePath(server_context_t *ctx, char *path);
+char *getAbsolutePath(char *path);
+bool is_valid_path(server_context_t *ctx, char *path);
 
 #endif

@@ -24,9 +24,9 @@
 #define OK 200
 #define CREATED 201
 #define BAD_REQUEST 400
+#define FORBIDDEN 403
 #define NOT_FOUND 404
 #define INTERNAL_SERVER_ERROR 500
-
 #define DEFAULT_STATUS_TEXT ""
 
 // Content-Type text
@@ -73,6 +73,7 @@ static const status_t status[] = {
     {OK, "Ok"},
     {CREATED, "Created"},
     {BAD_REQUEST, "Bad Request"},
+    {FORBIDDEN, "Forbidden"},
     {NOT_FOUND, "Not Found"},
     {INTERNAL_SERVER_ERROR, "Internal Server Error"},
 };

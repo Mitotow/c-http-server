@@ -1,0 +1,4 @@
+port:8080
+baseHref:./public
+routes:/,/index.html;/hello,/hello.html;/test,/test/test.html
+fallback:/

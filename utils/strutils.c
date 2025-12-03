@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 bool startsWithSpaceOrTab(char *str) {
   if (strlen(str) < 1) {
@@ -49,4 +50,52 @@ bool str_to_uint16(const char *str, uint16_t *res) {
 }
 
 // Check if a string is empty
-bool strempty(char *str) { return (str == NULL || strcmp(str, "") != 0); }
+bool strempty(char *str) { return (str == NULL || strcmp(str, "") == 0); }
+
+// Slice a string
+char *strcpyft(char *str, int from, int to) {
+  int strIndex = 0;
+  ulong size = to - from;
+  char *res = malloc(sizeof(char) * size + 1);
+  for (int i = from; i <= to; i++) {
+    res[strIndex] = str[i];
+    strIndex++;
+  }
+  res[size] = '\0';
+
+  return res;
+}
+
+void strkeyval(char *str, char *separator, char **key, char **value) {
+  char *dup = strdup(str);
+  char *saveptr = NULL;
+
+  *key = strtok_r(dup, separator, &saveptr);
+  if (*key != NULL) {
+    *key = trimOnlySpaceAndTab(*key);
+    *key = strdup(*key);
+  }
+
+  *value = strtok_r(NULL, separator, &saveptr);
+  if (*value != NULL) {
+    *value = trimOnlySpaceAndTab(*value);
+    *value = strdup(*value);
+  }
+
+  free(dup);
+}
+
+void strrm(char *str, char character) {
+  if (!str)
+    return;
+
+  char *src = str, *dst = str;
+
+  while (*src) {
+    if (*src != character) {
+      *dst++ = *src;
+    }
+    src++;
+  }
+  *dst = '\0';
+}

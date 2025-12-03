@@ -7,6 +7,7 @@
 #define SERVER_H
 
 // Server Parameters
+#define SERVER_NAME "CustomAbrst"
 #define DEFAULT_PORT 8080
 #define DEBUG true
 

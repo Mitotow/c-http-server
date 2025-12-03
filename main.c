@@ -1,8 +1,11 @@
 #include "lib/conf.h"
+#include "lib/filesystem.h"
 #include "router.h"
 #include "server.h"
+#include <assert.h>
 #include <signal.h>
 #include <stdint.h>
+#include <stdio.h>
 
 static server_context_t *ctx;
 
@@ -15,22 +18,11 @@ void handleSignal(int sig) {
   }
 }
 
-// Create the server's router
-router_t *createRouter() {
-  router_t *router = initRouter();
-  addRoute(router, "/", "/index.html");
-  addRoute(router, "/hello", "/hello.html");
-  addRoute(router, "/test", "/test/test.html");
-
-  return router;
-}
-
 int main() {
   config_t *config = parseConfig();
   ctx = createServer(config);
-  setRouter(ctx, createRouter());
+  setRouter(ctx, initRouter(config->routes, config->routes_size));
   runServer(ctx);
-
   signal(SIGINT, handleSignal);
   return 0;
 }

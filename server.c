@@ -58,14 +58,14 @@ char *getFilePathFromRequest(server_context_t *ctx, request_t req) {
   if (ext != NULL) {
     // Request a direct file
     writeLog(LOG_DEBUG, "Request a direct file");
-    return getFilePath(req.route);
+    return getFilePath(ctx, req.route);
   } else if (ctx->router != NULL) {
     // Request a configured route
     // TODO: Implement an handler system for each route
     writeLog(LOG_DEBUG, "Request a configured route");
     route_t *route;
     if ((route = getRouteByPath(ctx->router, req.route)) != NULL) {
-      return getFilePath(route->fileName);
+      return getFilePath(ctx, route->fileName);
     }
   }
 
@@ -79,13 +79,18 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
   response_t *res;
   if (strcmp(req->method, HTTP_GET) == 0 || isHead) {
     char *filePath = getFilePathFromRequest(arg->ctx, *req);
-    if (filePath != NULL) {
+
+    if (!is_valid_path(arg->ctx, filePath)) {
+      res = createResponse(req, FORBIDDEN);
+    } else if (filePath != NULL) {
       res = handleGet(req, filePath, isHead);
-      free(filePath);
     } else {
       // Route not found
       res = createResponse(req, NOT_FOUND);
     }
+
+    if (filePath)
+      free(filePath);
   } else {
     // We only handle GET request actually
     res = createResponse(req, BAD_REQUEST);
@@ -132,7 +137,7 @@ int handleClient(void *argument) {
       sendResponse(arg->client_fd, res);
       memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
       destroyRequest(req);
-      free(res);
+      destroyResponse(res);
       continue;
     }
 
@@ -159,7 +164,7 @@ int handleClient(void *argument) {
     }
 
     destroyRequest(req);
-    free(res);
+    destroyResponse(res);
 
     if (isClosed)
       break;
@@ -176,7 +181,7 @@ void handleConnections(server_context_t *ctx) {
   while (1) {
     int client_fd;
 
-    writeLog(LOG_DEBUG, "Waiting for connections");
+    writeLog(LOG_INFO, "Waiting for connections");
     if ((client_fd = accept(ctx->server_fd, &ctx->address, &ctx->addrlen)) <
         0) {
       continue;
@@ -244,7 +249,7 @@ void runServer(server_context_t *ctx) {
     writeFatal("Cannot listen");
   }
 
-  writeLog(LOG_DEBUG, "Server listening on port %d", ctx->config->port);
+  writeLog(LOG_INFO, "Server listening on port %d", ctx->config->port);
 
   handleConnections(ctx);
 }
