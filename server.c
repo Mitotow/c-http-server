@@ -85,8 +85,14 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
     } else if (filePath != NULL) {
       res = handleGet(req, filePath, isHead);
     } else {
-      // Route not found
-      res = createResponse(req, NOT_FOUND);
+      if (arg->ctx->config->fallback) {
+        free(req->route);
+        req->route = strdup(arg->ctx->config->fallback);
+        handleRequest(arg, req);
+      } else {
+        // Route not found
+        res = createResponse(req, NOT_FOUND);
+      }
     }
 
     if (filePath)
@@ -107,8 +113,6 @@ int handleClient(void *argument) {
   struct timeval tv;
   tv.tv_sec = KEEP_ALIVE_TIMEOUT;
   tv.tv_usec = 0;
-
-  writeLog(LOG_DEBUG, "Handle Client");
 
   while (1) {
     char buffer[HTTP_REQ_BUFFER_SIZE] = {0};
@@ -131,11 +135,11 @@ int handleClient(void *argument) {
     // Fetch request content
     writeLog(LOG_DEBUG, "Read the retrieved data and setup the request struct");
     request_t *req = createRequest(buffer);
+    memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
     if (!isValidRequest(req)) {
       writeLog(LOG_DEBUG, "Invalid request");
       response_t *res = createResponse(req, BAD_REQUEST);
       sendResponse(arg->client_fd, res);
-      memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
       destroyRequest(req);
       destroyResponse(res);
       continue;
@@ -145,8 +149,6 @@ int handleClient(void *argument) {
              req->method, req->connection, req->host, req->route);
 
     response_t *res = handleRequest(arg, req);
-
-    memset(buffer, 0, HTTP_REQ_BUFFER_SIZE);
 
     bool isClosed =
         req->connection == NULL || strcmp(req->connection, CONN_CLOSE) == 0;

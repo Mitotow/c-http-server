@@ -35,6 +35,20 @@ char *trimOnlySpaceAndTab(char *str) {
   return str;
 }
 
+// Remove the \n char at the end of a string
+char *strchomp(char *str) {
+  if (!str)
+    return NULL;
+
+  size_t len = strlen(str);
+
+  if (len > 0 && str[len - 1] == '\n') {
+    str[len - 1] = '\0';
+  }
+
+  return str;
+}
+
 bool str_to_uint16(const char *str, uint16_t *res) {
   char *endptr;
 

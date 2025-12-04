@@ -1,5 +1,6 @@
 #include "conf.h"
 #include "../server.h"
+#include "../utils/memutils.h"
 #include "../utils/strutils.h"
 #include "filesystem.h"
 #include "logger.h"
@@ -59,6 +60,8 @@ bool parseRoutes(config_t *config, char *values) {
         i == len - 1) {
       char *strroute = strcpyft(values, tmp, i);
       writeLog(LOG_DEBUG, "Configured route : %s", strroute);
+      trimOnlySpaceAndTab(strroute);
+      strchomp(strroute);
       if (!strempty(strroute)) {
         parseRoute(config, strroute);
       }
@@ -75,6 +78,8 @@ bool parseLine(config_t *config, char line[CONFIG_LINE_BUFF]) {
   char *key, *value;
   strkeyval(line, SEPARATOR_CHAR, &key, &value);
   if (key == NULL || value == NULL) {
+    FREE_ALL(key, value);
+
     return false;
   }
 
@@ -93,6 +98,10 @@ bool parseLine(config_t *config, char line[CONFIG_LINE_BUFF]) {
     config->base_href_length = strlen(config->base_href);
   } else if (strcmp(key, ROUTES_KEY) == 0) {
     parseRoutes(config, value);
+  } else if (strcmp(key, FALLBACK_KEY) == 0) {
+    config->fallback = trimOnlySpaceAndTab(value);
+    strchomp(config->fallback);
+    writeLog(LOG_DEBUG, "Configured fallback : %s", config->fallback);
   }
 
   return true;
@@ -105,7 +114,7 @@ config_t *initConfig() {
   }
 
   config->port = DEFAULT_PORT;
-  config->router_fallback = NULL;
+  config->fallback = NULL;
   config->routes_size = 0;
   config->routes = NULL;
   config->base_href = DEFAULT_BASEHREF;
@@ -139,6 +148,6 @@ void destroyConfig(config_t *config) {
   for (int i = 0; i < config->routes_size; i++) {
     free(config->routes[i]);
   }
-  free(config->routes);
-  free(config);
+
+  FREE_ALL(config->routes, config);
 }

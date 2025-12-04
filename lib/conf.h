@@ -22,10 +22,11 @@
 #define PORT_KEY "port"
 #define BASE_HREF_KEY "baseHref"
 #define ROUTES_KEY "routes"
+#define FALLBACK_KEY "fallback"
 
 typedef struct {
   uint16_t port;
-  char *router_fallback;
+  char *fallback;
   size_t routes_size;
   unsigned long base_href_length;
   char *base_href;
