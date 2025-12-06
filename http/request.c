@@ -142,5 +142,17 @@ void destroyRequest(request_t *req) {
     return;
   }
 
+  if (req->method) free(req->method);
+  if (req->route) free(req->route);
+  if (req->httpVersion) free(req->httpVersion);
+  if (req->host) free(req->host);
+  if (req->userAgent) free(req->userAgent);
+  if (req->connection) free(req->connection);
+  if (req->accept) free(req->accept);
+  if (req->acceptLanguage) free(req->acceptLanguage);
+  if (req->acceptEncoding) free(req->acceptEncoding);
+  if (req->contentType) free(req->contentType);
+  if (req->content) free(req->content);
+
   free(req);
 }

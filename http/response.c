@@ -115,6 +115,8 @@ void destroyResponse(response_t *res) {
   if (res) {
     if (res->date)
       free(res->date);
+    if (res->content)
+      free(res->content);
     free(res);
   }
 }

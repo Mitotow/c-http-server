@@ -17,7 +17,7 @@ router_t *initRouter(route_t **routes, size_t routes_size) {
 // Check if a route exists
 bool existsRoute(router_t *router, route_t route) {
   for (int i = 0; i < router->routes_size; i++) {
-    if (router->routes[i]->path == route.path) {
+    if (strcmp(router->routes[i]->path, route.path) == 0) {
       return true;
     }
   }

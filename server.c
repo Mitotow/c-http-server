@@ -33,6 +33,7 @@ response_t *handleGet(request_t *req, char *filePath, bool isHead) {
       } else {
         res = createContentResponse(req, contentType, NULL, contentSize);
       }
+      return res;
     }
 
     char *content;
@@ -88,7 +89,7 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
       if (arg->ctx->config->fallback) {
         free(req->route);
         req->route = strdup(arg->ctx->config->fallback);
-        handleRequest(arg, req);
+        res = handleRequest(arg, req);
       } else {
         // Route not found
         res = createResponse(req, NOT_FOUND);

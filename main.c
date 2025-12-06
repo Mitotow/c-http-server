@@ -22,7 +22,7 @@ int main() {
   config_t *config = parseConfig();
   ctx = createServer(config);
   setRouter(ctx, initRouter(config->routes, config->routes_size));
-  runServer(ctx);
   signal(SIGINT, handleSignal);
+  runServer(ctx);
   return 0;
 }
