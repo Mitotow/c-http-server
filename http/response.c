@@ -1,6 +1,7 @@
 #include "response.h"
 #include "http.h"
 #include "request.h"
+#include "../utils/memutils.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -112,11 +113,9 @@ response_t *createContentResponse(request_t *req, char *contentType,
 }
 
 void destroyResponse(response_t *res) {
-  if (res) {
-    if (res->date)
-      free(res->date);
-    if (res->content)
-      free(res->content);
-    free(res);
+  if (!res) {
+    return;
   }
+  
+  FREE_ALL(res->date, res->content, res);
 }
