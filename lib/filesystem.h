@@ -34,6 +34,6 @@ char *readTextFile(char *path, long *size);
 char *getExtension(char *path);
 char *getFilePath(server_context_t *ctx, char *path);
 char *getAbsolutePath(char *path);
-bool is_valid_path(server_context_t *ctx, char *path);
+int is_valid_path(server_context_t *ctx, char *path);
 
 #endif

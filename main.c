@@ -16,7 +16,7 @@ void handleSignal(int sig) {
   if (ctx != NULL) {
     stopServer(ctx);
   }
-  
+
   exit(0);
 }
 

@@ -5,6 +5,7 @@
 #include "lib/filesystem.h"
 #include "lib/logger.h"
 #include "router.h"
+#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -14,6 +15,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <threads.h>
+#include <time.h>
 #include <unistd.h>
 
 // Function in charge of retrieving the file and create the response
@@ -33,6 +35,7 @@ response_t *handleGet(request_t *req, char *filePath, bool isHead) {
       } else {
         res = createContentResponse(req, contentType, NULL, contentSize);
       }
+
       return res;
     }
 
@@ -40,13 +43,18 @@ response_t *handleGet(request_t *req, char *filePath, bool isHead) {
     if (isTextContentType(contentType)) {
       content = readTextFile(filePath, &contentSize);
     } else {
-      content = readFile(filePath, &contentSize);
-    }
+      char *content;
+      if (isTextContentType(contentType)) {
+        content = readTextFile(filePath, &contentSize);
+      } else {
+        content = readFile(filePath, &contentSize);
+      }
 
-    if (content != NULL && contentSize > 0) {
-      res = createContentResponse(req, contentType, content, contentSize);
-    } else {
-      res = createResponse(req, NOT_FOUND);
+      if (content != NULL && contentSize > 0) {
+        res = createContentResponse(req, contentType, content, contentSize);
+      } else {
+        res = createResponse(req, NOT_FOUND);
+      }
     }
   }
 
@@ -80,24 +88,26 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
   response_t *res;
   if (strcmp(req->method, HTTP_GET) == 0 || isHead) {
     char *filePath = getFilePathFromRequest(arg->ctx, *req);
+    int isValidPath = is_valid_path(arg->ctx, filePath);
 
-    if (!is_valid_path(arg->ctx, filePath)) {
-      res = createResponse(req, FORBIDDEN);
-    } else if (filePath != NULL) {
-      res = handleGet(req, filePath, isHead);
-    } else {
+    if (isValidPath != 0) {
       if (arg->ctx->config->fallback) {
         free(req->route);
         req->route = strdup(arg->ctx->config->fallback);
         res = handleRequest(arg, req);
-      } else {
+      } else if (isValidPath == ENOENT) {
         // Route not found
         res = createResponse(req, NOT_FOUND);
+      } else {
+        res = createResponse(req, FORBIDDEN);
       }
+    } else {
+      res = handleGet(req, filePath, isHead);
     }
 
-    if (filePath)
+    if (filePath) {
       free(filePath);
+    }
   } else {
     // We only handle GET request actually
     res = createResponse(req, BAD_REQUEST);
@@ -116,6 +126,7 @@ int handleClient(void *argument) {
   tv.tv_usec = 0;
 
   while (1) {
+    clock_t start = clock();
     char buffer[HTTP_REQ_BUFFER_SIZE] = {0};
     ssize_t bytes_read;
 
@@ -164,6 +175,13 @@ int handleClient(void *argument) {
                "sent=%ld",
                res->httpVersion, res->status.code, res->status.text,
                res->contentType, res->contentLength, bytes_sent);
+    }
+
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    if (time_spent > 0.1) {
+      writeLog(LOG_WARN, "SLOW REQUEST: %.3f seconds for %s", time_spent,
+               req->route);
     }
 
     destroyRequest(req);

@@ -135,6 +135,7 @@ config_t *parseConfig() {
 
   char line[CONFIG_LINE_BUFF];
   while (fgets(line, sizeof(line), file)) {
+    trimOnlySpaceAndTab(line);
     if (line[0] == COMMENTARY_CHAR)
       continue;
     parseLine(config, line);

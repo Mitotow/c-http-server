@@ -1,6 +1,7 @@
 #include "filesystem.h"
 #include "../utils/strutils.h"
 #include "logger.h"
+#include <asm-generic/errno-base.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -100,7 +101,7 @@ char *getAbsolutePath(char *path) {
 }
 
 // Check if path exists and result is inside context base href
-bool is_valid_path(server_context_t *ctx, char *path) {
+int is_valid_path(server_context_t *ctx, char *path) {
   // Will always point to base_href
   if (path == NULL)
     return true;
@@ -108,7 +109,7 @@ bool is_valid_path(server_context_t *ctx, char *path) {
   char *ptr;
   ptr = getAbsolutePath(path);
   if (ptr == NULL) {
-    return false;
+    return ENOENT;
   }
 
   // Check if path starts with base href
@@ -123,5 +124,5 @@ bool is_valid_path(server_context_t *ctx, char *path) {
   }
 
   free(ptr);
-  return is_valid;
+  return is_valid ? 0 : EACCES;
 }
