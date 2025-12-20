@@ -1,5 +1,6 @@
 #include "../router.h"
 #include <netinet/in.h>
+#include <stdint.h>
 
 #ifndef CONF_H
 #define CONF_H
@@ -23,6 +24,8 @@
 #define BASE_HREF_KEY "baseHref"
 #define ROUTES_KEY "routes"
 #define FALLBACK_KEY "fallback"
+#define CACHE_MAX_ENTRIES_KEY "cache_max_entries"
+#define CACHE_TTL_KEY "cache_ttl"
 
 typedef struct {
   uint16_t port;
@@ -31,6 +34,8 @@ typedef struct {
   unsigned long base_href_length;
   char *base_href;
   route_t **routes;
+  uint16_t cache_max_entries;
+  time_t cache_ttl;
 } config_t;
 
 config_t *parseConfig();

@@ -1,5 +1,6 @@
 #include "router.h"
 #include "lib/conf.h"
+#include "utils/memutils.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,9 @@ route_t *getRouteByPath(router_t *router, char *path) {
 
 // Destroy router
 void destroyRouter(router_t *router) {
-  free(router->routes);
-  free(router);
+  for (int i = 0; i < router->routes_size; i++) {
+    route_t *route = router->routes[i];
+    FREE_ALL(route->fileName, route->path, route);
+  }
+  FREE_ALL(router, router->routes);
 }

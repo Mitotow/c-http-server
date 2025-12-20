@@ -2,59 +2,68 @@
 #include "http/http.h"
 #include "http/request.h"
 #include "http/response.h"
+#include "lib/cache.h"
 #include "lib/filesystem.h"
 #include "lib/logger.h"
 #include "router.h"
 #include <asm-generic/errno-base.h>
+#include <bits/pthreadtypes.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <threads.h>
 #include <time.h>
 #include <unistd.h>
 
 // Function in charge of retrieving the file and create the response
-response_t *handleGet(request_t *req, char *filePath, bool isHead) {
+response_t *handleGet(server_context_t *ctx, request_t *req, char *filePath,
+                      bool isHead) {
   response_t *res;
   if (filePath == NULL) {
     res = createResponse(req, NOT_FOUND);
   } else {
     char *ext = getExtension(filePath);
     char *contentType = (char *)getContentType(ext);
+    char *content = NULL;
     long contentSize;
+    cache_entry_t *entry;
 
-    if (isHead) {
-      contentSize = getFileSizeFromPath(filePath);
-      if (contentSize == -1) {
-        res = createResponse(req, NOT_FOUND);
+    cache_print_debug(ctx->cache);
+    if ((entry = get_cache_entry_by_path(ctx->cache, filePath))) {
+      pthread_mutex_lock(&ctx->cache->mutex);
+      contentSize = entry->size;
+      if (!isHead)
+        content = entry->content;
+      pthread_mutex_unlock(&ctx->cache->mutex);
+    } else {
+      if (isHead) {
+        contentSize = getFileSizeFromPath(filePath);
       } else {
-        res = createContentResponse(req, contentType, NULL, contentSize);
+        if (isTextContentType(contentType)) {
+          content = readTextFile(filePath, &contentSize);
+        } else {
+          content = readFile(filePath, &contentSize);
+        }
       }
-
-      return res;
     }
 
-    char *content;
-    if (isTextContentType(contentType)) {
-      content = readTextFile(filePath, &contentSize);
+    if (contentSize > 0) {
+      if (!entry) {
+        char *content_cp = malloc(contentSize);
+        memcpy(content_cp, content, contentSize);
+        if (content_cp) {
+          add_cache_entry(ctx->cache, strdup(filePath), contentSize,
+                          content_cp);
+        }
+      }
+      res = createContentResponse(req, contentType, content, contentSize);
     } else {
-      char *content;
-      if (isTextContentType(contentType)) {
-        content = readTextFile(filePath, &contentSize);
-      } else {
-        content = readFile(filePath, &contentSize);
-      }
-
-      if (content != NULL && contentSize > 0) {
-        res = createContentResponse(req, contentType, content, contentSize);
-      } else {
-        res = createResponse(req, NOT_FOUND);
-      }
+      res = createResponse(req, NOT_FOUND);
     }
   }
 
@@ -69,7 +78,6 @@ char *getFilePathFromRequest(server_context_t *ctx, request_t req) {
     writeLog(LOG_DEBUG, "Request a direct file");
     return getFilePath(ctx, req.route);
   } else if (ctx->router != NULL) {
-    // Request a configured route
     // TODO: Implement an handler system for each route
     writeLog(LOG_DEBUG, "Request a configured route");
     route_t *route;
@@ -102,10 +110,7 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
         res = createResponse(req, FORBIDDEN);
       }
     } else {
-      res = handleGet(req, filePath, isHead);
-    }
-
-    if (filePath) {
+      res = handleGet(arg->ctx, req, filePath, isHead);
       free(filePath);
     }
   } else {
@@ -117,7 +122,7 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
 }
 
 // Handle communication between server and one client
-int handleClient(void *argument) {
+void *handleClient(void *argument) {
   handle_client_argument_t *arg = (handle_client_argument_t *)argument;
 
   // Setup timeout
@@ -194,7 +199,8 @@ int handleClient(void *argument) {
   writeLog(LOG_DEBUG, "Client disconnected");
   close(arg->client_fd);
   free(arg);
-  return thrd_success;
+
+  return NULL;
 }
 
 // Handle incoming connections
@@ -212,15 +218,15 @@ void handleConnections(server_context_t *ctx) {
     arg->client_fd = client_fd;
     arg->ctx = ctx;
 
-    thrd_t id_thread;
+    pthread_t id_thread;
     writeLog(LOG_DEBUG, "Creating thread to handle new client");
-    if (thrd_create(&id_thread, &handleClient, (void *)arg) != thrd_success) {
+    if (pthread_create(&id_thread, NULL, &handleClient, (void *)arg) != 0) {
       close(client_fd);
       free(arg);
       continue;
     }
 
-    thrd_detach(id_thread);
+    pthread_detach(id_thread);
   }
 }
 
@@ -247,6 +253,7 @@ server_context_t *createServer(config_t *config) {
   ctx->address = *(struct sockaddr *)&address;
   ctx->addrlen = sizeof(address);
   ctx->config = config;
+  ctx->cache = create_file_cache(10, 600);
 
   return ctx;
 }
@@ -278,9 +285,12 @@ void runServer(server_context_t *ctx) {
 // Stop server
 void stopServer(server_context_t *ctx) {
   close(ctx->server_fd);
-  if (ctx->router != NULL) {
+  if (ctx->router)
     destroyRouter(ctx->router);
-  }
+  if (ctx->config)
+    destroyConfig(ctx->config);
+  if (ctx->cache)
+    destroy_cache(ctx->cache);
   free(ctx);
 
   writeLog(LOG_INFO, "Server stopped");

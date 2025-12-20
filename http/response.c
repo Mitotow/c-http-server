@@ -1,7 +1,7 @@
 #include "response.h"
+#include "../utils/memutils.h"
 #include "http.h"
 #include "request.h"
-#include "../utils/memutils.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -9,6 +9,10 @@
 
 // Send response to client socket
 ssize_t sendResponse(int client_socket, response_t *res) {
+  if (!res) {
+    return -1;
+  }
+
   char header[RESPONSE_HEADER_SIZE];
   char *cur = header;
   char *const end = header + sizeof(header);
@@ -116,6 +120,6 @@ void destroyResponse(response_t *res) {
   if (!res) {
     return;
   }
-  
+
   FREE_ALL(res->date, res->content, res);
 }

@@ -1,3 +1,4 @@
+#include "lib/cache.h"
 #include "lib/conf.h"
 #include "router.h"
 #include <netinet/in.h>
@@ -18,6 +19,7 @@ typedef struct {
   socklen_t addrlen;
   router_t *router;
   config_t *config;
+  file_cache_t *cache;
 } server_context_t;
 
 typedef struct {

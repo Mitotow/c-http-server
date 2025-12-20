@@ -104,6 +104,7 @@ bool parseLine(config_t *config, char line[CONFIG_LINE_BUFF]) {
     writeLog(LOG_DEBUG, "Configured fallback : %s", config->fallback);
   }
 
+  FREE_ALL(key, value);
   return true;
 }
 
@@ -117,7 +118,7 @@ config_t *initConfig() {
   config->fallback = NULL;
   config->routes_size = 0;
   config->routes = NULL;
-  config->base_href = DEFAULT_BASEHREF;
+  config->base_href = strdup(DEFAULT_BASEHREF);
   config->base_href_length = strlen(DEFAULT_BASEHREF);
 
   return config;
@@ -146,9 +147,5 @@ config_t *parseConfig() {
 }
 
 void destroyConfig(config_t *config) {
-  for (int i = 0; i < config->routes_size; i++) {
-    free(config->routes[i]);
-  }
-
-  FREE_ALL(config->routes, config);
+  FREE_ALL(config->base_href, config->fallback, config);
 }
