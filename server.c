@@ -55,8 +55,8 @@ response_t *handleGet(server_context_t *ctx, request_t *req, char *filePath,
     if (contentSize > 0) {
       if (!entry) {
         char *content_cp = malloc(contentSize);
-        memcpy(content_cp, content, contentSize);
         if (content_cp) {
+          memcpy(content_cp, content, contentSize);
           add_cache_entry(ctx->cache, strdup(filePath), contentSize,
                           content_cp);
         }
@@ -99,12 +99,12 @@ response_t *handleRequest(handle_client_argument_t *arg, request_t *req) {
     int isValidPath = is_valid_path(arg->ctx, filePath);
 
     if (isValidPath != 0) {
-      if (arg->ctx->config->fallback) {
+      if (arg->ctx->config->fallback &&
+          strcmp(arg->ctx->config->fallback, req->route) != 0) {
         free(req->route);
         req->route = strdup(arg->ctx->config->fallback);
         res = handleRequest(arg, req);
       } else if (isValidPath == ENOENT) {
-        // Route not found
         res = createResponse(req, NOT_FOUND);
       } else {
         res = createResponse(req, FORBIDDEN);

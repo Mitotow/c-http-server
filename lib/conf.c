@@ -146,6 +146,4 @@ config_t *parseConfig() {
   return config;
 }
 
-void destroyConfig(config_t *config) {
-  FREE_ALL(config->base_href, config->fallback, config);
-}
+void destroyConfig(config_t *config) { FREE_ALL(config->base_href, config); }
